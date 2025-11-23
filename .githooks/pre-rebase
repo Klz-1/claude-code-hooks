@@ -20,11 +20,23 @@ if [[ "$UPSTREAM" == "main" ]] || [[ "$UPSTREAM" == "master" ]]; then
     echo -e "${RED}[WARNING]${NC} You are attempting to rebase onto $UPSTREAM"
     echo -e "${YELLOW}         This will rewrite history of $UPSTREAM${NC}"
 
-    read -p "Are you sure you want to continue? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${RED}[BLOCKED]${NC} Rebase cancelled"
-        exit 1
+    # Check for non-interactive mode
+    if [[ ! -t 0 ]] || [[ -n "$CI" ]] || [[ -n "$GITHUB_ACTIONS" ]] || [[ -n "$GITLAB_CI" ]]; then
+        if [[ "$ALLOW_REBASE_MAIN" == "1" ]]; then
+            echo -e "${YELLOW}[ALLOWED]${NC} Non-interactive mode with ALLOW_REBASE_MAIN=1"
+        else
+            echo -e "${RED}[BLOCKED]${NC} Cannot rebase onto $UPSTREAM in non-interactive mode"
+            echo -e "${YELLOW}           Set ALLOW_REBASE_MAIN=1 to override or use --no-verify${NC}"
+            exit 1
+        fi
+    else
+        # Interactive mode
+        read -p "Are you sure you want to continue? [y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[BLOCKED]${NC} Rebase cancelled"
+            exit 1
+        fi
     fi
 fi
 
@@ -50,11 +62,23 @@ if git rev-parse --verify "$REMOTE_BRANCH" >/dev/null 2>&1; then
         echo -e "${YELLOW}         Rebasing will rewrite public history${NC}"
         echo -e "${YELLOW}         You will need to force push after rebasing${NC}"
 
-        read -p "Continue with rebase? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${RED}[BLOCKED]${NC} Rebase cancelled"
-            exit 1
+        # Check for non-interactive mode
+        if [[ ! -t 0 ]] || [[ -n "$CI" ]] || [[ -n "$GITHUB_ACTIONS" ]] || [[ -n "$GITLAB_CI" ]]; then
+            if [[ "$ALLOW_REBASE_PUBLIC" == "1" ]]; then
+                echo -e "${YELLOW}[ALLOWED]${NC} Non-interactive mode with ALLOW_REBASE_PUBLIC=1"
+            else
+                echo -e "${RED}[BLOCKED]${NC} Cannot rebase published commits in non-interactive mode"
+                echo -e "${YELLOW}           Set ALLOW_REBASE_PUBLIC=1 to override or use --no-verify${NC}"
+                exit 1
+            fi
+        else
+            # Interactive mode
+            read -p "Continue with rebase? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo -e "${RED}[BLOCKED]${NC} Rebase cancelled"
+                exit 1
+            fi
         fi
     fi
 fi

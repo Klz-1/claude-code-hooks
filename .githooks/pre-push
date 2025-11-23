@@ -31,11 +31,25 @@ while read local_ref local_sha remote_ref remote_sha; do
     echo -e "${BLUE}[CHECK]${NC} Verifying target branch..."
     if [[ "$REMOTE_BRANCH" == "main" ]] || [[ "$REMOTE_BRANCH" == "master" ]]; then
         echo -e "${YELLOW}[WARNING]${NC} Pushing directly to $REMOTE_BRANCH"
-        read -p "Are you sure you want to push to $REMOTE_BRANCH? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${RED}[BLOCKED]${NC} Push to $REMOTE_BRANCH cancelled"
-            exit 1
+
+        # Check if running in non-interactive mode (CI/CD, scripts, etc.)
+        if [[ ! -t 0 ]] || [[ -n "$CI" ]] || [[ -n "$GITHUB_ACTIONS" ]] || [[ -n "$GITLAB_CI" ]]; then
+            # Non-interactive mode
+            if [[ "$ALLOW_MAIN_PUSH" == "1" ]] || [[ "$ALLOW_PROTECTED_PUSH" == "1" ]]; then
+                echo -e "${YELLOW}[ALLOWED]${NC} Non-interactive mode with ALLOW_MAIN_PUSH=1"
+            else
+                echo -e "${RED}[BLOCKED]${NC} Cannot push to $REMOTE_BRANCH in non-interactive mode"
+                echo -e "${YELLOW}           Set ALLOW_MAIN_PUSH=1 to override or use --no-verify${NC}"
+                exit 1
+            fi
+        else
+            # Interactive mode - ask for confirmation
+            read -p "Are you sure you want to push to $REMOTE_BRANCH? [y/N] " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo -e "${RED}[BLOCKED]${NC} Push to $REMOTE_BRANCH cancelled"
+                exit 1
+            fi
         fi
     fi
 
@@ -51,11 +65,23 @@ while read local_ref local_sha remote_ref remote_sha; do
                 exit 1
             fi
 
-            read -p "Force push detected. Continue? [y/N] " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                echo -e "${RED}[BLOCKED]${NC} Force push cancelled"
-                exit 1
+            # Check for non-interactive mode
+            if [[ ! -t 0 ]] || [[ -n "$CI" ]] || [[ -n "$GITHUB_ACTIONS" ]] || [[ -n "$GITLAB_CI" ]]; then
+                if [[ "$ALLOW_FORCE_PUSH" == "1" ]]; then
+                    echo -e "${YELLOW}[ALLOWED]${NC} Non-interactive mode with ALLOW_FORCE_PUSH=1"
+                else
+                    echo -e "${RED}[BLOCKED]${NC} Force push not allowed in non-interactive mode"
+                    echo -e "${YELLOW}           Set ALLOW_FORCE_PUSH=1 to override or use --no-verify${NC}"
+                    exit 1
+                fi
+            else
+                # Interactive mode
+                read -p "Force push detected. Continue? [y/N] " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    echo -e "${RED}[BLOCKED]${NC} Force push cancelled"
+                    exit 1
+                fi
             fi
         fi
     fi
