@@ -1,0 +1,9 @@
+name: configure-hooks
+version: 1.0.0
+description: Interactively configure Claude Code and Git hooks settings
+author: Claude Code Hooks
+tags:
+  - configuration
+  - hooks
+  - setup
+  - interactive
