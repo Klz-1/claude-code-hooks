@@ -1,0 +1,189 @@
+#!/bin/bash
+# Periodic Branch Checker
+# Can be run manually or via cron to ensure you're on the right branch
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Clear screen for better visibility (optional, comment out if not desired)
+# clear
+
+# Get current branch
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo -e "${RED}[ERROR]${NC} Not in a git repository"
+    exit 1
+fi
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+GIT_ROOT=$(git rev-parse --show-toplevel)
+
+# Banner
+echo ""
+echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║           GIT BRANCH STATUS CHECK                      ║${NC}"
+echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Show repository
+REPO_NAME=$(basename "$GIT_ROOT")
+echo -e "${BLUE}  📁 Repository:${NC} $REPO_NAME"
+echo -e "${BLUE}  📍 Location:${NC} $GIT_ROOT"
+echo ""
+
+# Show current branch with visual indicator
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+if [[ "$CURRENT_BRANCH" == "main" ]] || [[ "$CURRENT_BRANCH" == "master" ]]; then
+    echo -e "  ${RED}⚠️  PROTECTED BRANCH${NC}"
+    echo -e "  ${RED}➜  $CURRENT_BRANCH${NC}"
+    echo ""
+    echo -e "  ${YELLOW}⚡ Warning: You are on a protected branch!${NC}"
+    echo -e "  ${YELLOW}   Avoid making direct commits here.${NC}"
+    echo -e "  ${YELLOW}   Consider creating a feature branch.${NC}"
+elif [[ "$CURRENT_BRANCH" == "develop" ]] || [[ "$CURRENT_BRANCH" == "staging" ]]; then
+    echo -e "  ${YELLOW}⚡ SHARED BRANCH${NC}"
+    echo -e "  ${YELLOW}➜  $CURRENT_BRANCH${NC}"
+    echo ""
+    echo -e "  ${BLUE}💡 Note: This is a shared branch.${NC}"
+    echo -e "  ${BLUE}   Coordinate with your team before pushing.${NC}"
+else
+    echo -e "  ${GREEN}✓ FEATURE BRANCH${NC}"
+    echo -e "  ${GREEN}➜  $CURRENT_BRANCH${NC}"
+fi
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Check remote tracking
+if git rev-parse @{u} >/dev/null 2>&1; then
+    REMOTE_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u})
+
+    # Count commits ahead/behind
+    AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+    BEHIND=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+
+    echo -e "${BLUE}  🌐 Remote Tracking${NC}"
+    echo -e "  ├─ Tracking: $REMOTE_BRANCH"
+
+    if [[ $AHEAD -gt 0 ]] && [[ $BEHIND -gt 0 ]]; then
+        echo -e "  ├─ Status: ${YELLOW}Diverged${NC}"
+        echo -e "  ├─ ${GREEN}↑ $AHEAD commit(s) ahead${NC}"
+        echo -e "  └─ ${YELLOW}↓ $BEHIND commit(s) behind${NC}"
+        echo ""
+        echo -e "  ${YELLOW}💡 Action needed:${NC} Pull or rebase to sync with remote"
+    elif [[ $AHEAD -gt 0 ]]; then
+        echo -e "  ├─ Status: ${GREEN}Ahead${NC}"
+        echo -e "  └─ ${GREEN}↑ $AHEAD unpushed commit(s)${NC}"
+        echo ""
+        echo -e "  ${BLUE}💡 Ready to push:${NC} git push"
+    elif [[ $BEHIND -gt 0 ]]; then
+        echo -e "  ├─ Status: ${YELLOW}Behind${NC}"
+        echo -e "  └─ ${YELLOW}↓ $BEHIND commit(s) behind remote${NC}"
+        echo ""
+        echo -e "  ${YELLOW}💡 Action needed:${NC} git pull"
+    else
+        echo -e "  └─ Status: ${GREEN}✓ Up to date${NC}"
+    fi
+else
+    echo -e "${BLUE}  🌐 Remote Tracking${NC}"
+    echo -e "  └─ ${YELLOW}No remote tracking branch${NC}"
+    echo ""
+    echo -e "  ${BLUE}💡 To push:${NC} git push -u origin $CURRENT_BRANCH"
+fi
+
+echo ""
+
+# Check working directory status
+MODIFIED=$(git status --porcelain 2>/dev/null | grep -E '^( M|M )' | wc -l | tr -d ' ')
+ADDED=$(git status --porcelain 2>/dev/null | grep -E '^(A |AM)' | wc -l | tr -d ' ')
+DELETED=$(git status --porcelain 2>/dev/null | grep -E '^( D|D )' | wc -l | tr -d ' ')
+UNTRACKED=$(git status --porcelain 2>/dev/null | grep -E '^\?\?' | wc -l | tr -d ' ')
+TOTAL=$((MODIFIED + ADDED + DELETED + UNTRACKED))
+
+echo -e "${BLUE}  📊 Working Directory${NC}"
+
+if [[ $TOTAL -eq 0 ]]; then
+    echo -e "  └─ ${GREEN}✓ Clean (no changes)${NC}"
+else
+    echo -e "  ├─ ${YELLOW}$TOTAL file(s) with changes${NC}"
+    [[ $MODIFIED -gt 0 ]] && echo -e "  ├─ ${YELLOW}Modified: $MODIFIED${NC}"
+    [[ $ADDED -gt 0 ]] && echo -e "  ├─ ${GREEN}Added: $ADDED${NC}"
+    [[ $DELETED -gt 0 ]] && echo -e "  ├─ ${RED}Deleted: $DELETED${NC}"
+    [[ $UNTRACKED -gt 0 ]] && echo -e "  └─ ${BLUE}Untracked: $UNTRACKED${NC}"
+
+    echo ""
+    echo -e "  ${BLUE}💡 View details:${NC} git status"
+fi
+
+echo ""
+
+# Check for stashed changes
+STASHED=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
+
+if [[ $STASHED -gt 0 ]]; then
+    echo -e "${BLUE}  📦 Stashed Changes${NC}"
+    echo -e "  └─ ${YELLOW}$STASHED stash(es) available${NC}"
+    echo ""
+    echo -e "  ${BLUE}💡 View stashes:${NC} git stash list"
+    echo ""
+fi
+
+# Show last commit
+echo -e "${BLUE}  📝 Last Commit${NC}"
+LAST_COMMIT=$(git log -1 --pretty=format:"  ├─ %h - %s" 2>/dev/null)
+LAST_AUTHOR=$(git log -1 --pretty=format:"  ├─ Author: %an" 2>/dev/null)
+LAST_DATE=$(git log -1 --pretty=format:"  └─ %ar" 2>/dev/null)
+
+echo -e "$LAST_COMMIT"
+echo -e "$LAST_AUTHOR"
+echo -e "$LAST_DATE"
+echo ""
+
+# Show upcoming reminders
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  💡 Quick Reminders${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Branch naming reminder
+if [[ ! "$CURRENT_BRANCH" =~ ^(main|master|develop|staging|production)$ ]]; then
+    if [[ "$CURRENT_BRANCH" =~ ^(feature|bugfix|hotfix|release|chore|docs|test)/ ]]; then
+        echo -e "  ${GREEN}✓${NC} Branch name follows convention"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Consider following branch naming convention:"
+        echo -e "     feature/*, bugfix/*, hotfix/*, chore/*"
+    fi
+fi
+
+# Commit frequency reminder
+COMMITS_TODAY=$(git log --since="midnight" --oneline 2>/dev/null | wc -l | tr -d ' ')
+if [[ $COMMITS_TODAY -eq 0 ]]; then
+    echo -e "  ${BLUE}💡${NC} No commits today - commit often to save progress!"
+elif [[ $COMMITS_TODAY -gt 10 ]]; then
+    echo -e "  ${GREEN}✓${NC} $COMMITS_TODAY commits today - great progress!"
+else
+    echo -e "  ${GREEN}✓${NC} $COMMITS_TODAY commit(s) today"
+fi
+
+# Time since last commit
+LAST_COMMIT_TIME=$(git log -1 --pretty=format:"%ct" 2>/dev/null)
+if [[ -n "$LAST_COMMIT_TIME" ]]; then
+    HOURS_SINCE_COMMIT=$(( ($(date +%s) - LAST_COMMIT_TIME) / 3600 ))
+else
+    HOURS_SINCE_COMMIT=0
+fi
+
+if [[ $HOURS_SINCE_COMMIT -gt 24 ]]; then
+    echo -e "  ${YELLOW}⚠${NC} Last commit was $HOURS_SINCE_COMMIT hours ago"
+    echo -e "     Consider committing your current progress"
+fi
+
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Optional: Set this up in cron to run periodically
+# Add to crontab: */30 * * * * cd /path/to/repo && /path/to/.githooks/check-branch

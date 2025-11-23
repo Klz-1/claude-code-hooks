@@ -7,13 +7,20 @@
     "build": "tsc",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "lint:staged": "eslint --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx,js,json}'",
     "format:check": "prettier --check 'src/**/*.{ts,tsx,js,json}'",
     "test": "jest",
     "test:watch": "jest --watch",
-    "type-check": "tsc --noEmit"
+    "test:coverage": "jest --coverage",
+    "type-check": "tsc --noEmit",
+    "prepare": "bash .githooks/install.sh 2>/dev/null || true"
   },
-  "keywords": ["claude", "hooks", "automation"],
+  "keywords": [
+    "claude",
+    "hooks",
+    "automation"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
